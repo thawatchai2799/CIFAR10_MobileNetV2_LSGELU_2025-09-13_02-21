@@ -1,0 +1,47 @@
+import numpy as np
+import glob
+import matplotlib.pyplot as plt
+
+# ฟังก์ชันโหลดไฟล์ .npz และเตรียมข้อมูล
+def load_results(prefix):
+    accuracy_list = []
+    loss_list = []
+    files_accuracy = sorted(glob.glob(f"{prefix}_*.npz"))
+    files_loss = sorted(glob.glob(f"{prefix}_*.npz"))
+    for file in files_accuracy:
+        data = np.load(file)
+        accuracy_list.append(data['accuracy'])
+    for file in files_loss:
+        data = np.load(file)
+        loss_list.append(data['loss'])
+    return np.array(accuracy_list), np.array(loss_list)
+
+# โหลดผลของ relu6 กับ paralu
+acc_relu6, loss_relu6 = load_results("accuracy_relu6")
+acc_paralu, loss_paralu = load_results("accuracy_paralu")
+
+epochs = acc_relu6.shape[1]  # จำนวน epoch จากข้อมูล
+
+# plot Accuracy
+plt.figure(figsize=(12, 6))
+for i in range(acc_relu6.shape[0]):
+    plt.plot(acc_relu6[i], label=f'ReLU6 Run {i}', alpha=0.5)
+for i in range(acc_paralu.shape[0]):
+    plt.plot(acc_paralu[i], label=f'Paralu Run {i}', alpha=0.5, linestyle='--')
+plt.xlabel('Epoch')
+plt.ylabel('Accuracy')
+plt.title('Accuracy Comparison (3 Runs each)')
+plt.legend()
+plt.show()
+
+# plot Loss
+plt.figure(figsize=(12, 6))
+for i in range(loss_relu6.shape[0]):
+    plt.plot(loss_relu6[i], label=f'ReLU6 Run {i}', alpha=0.5)
+for i in range(loss_paralu.shape[0]):
+    plt.plot(loss_paralu[i], label=f'Paralu Run {i}', alpha=0.5, linestyle='--')
+plt.xlabel('Epoch')
+plt.ylabel('Loss')
+plt.title('Loss Comparison (3 Runs each)')
+plt.legend()
+plt.show()

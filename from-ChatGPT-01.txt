@@ -1,0 +1,108 @@
+import numpy as np
+import tensorflow as tf
+from tensorflow.keras.layers import Input, Conv2D, DepthwiseConv2D, BatchNormalization, MaxPooling2D, GlobalAveragePooling2D, Dense, Activation
+from tensorflow.keras.models import Model
+
+# Define relu6
+def relu6(x):
+    return tf.keras.activations.relu(x, max_value=6)
+
+# Define paralu
+def paralu(x):
+    cube_root_of_three = 3 ** (1/3)
+    return tf.where(
+        x >= 0,
+        x,
+        tf.where(
+            x >= -cube_root_of_three,
+            x * (1/3) * tf.pow(x + cube_root_of_three, 3),
+            tf.zeros_like(x)
+        )
+    )
+
+# Function สำหรับสร้างโมเดล
+def build_model(activation_fn):
+    inputs = Input(shape=(32, 32, 3))
+    x = Conv2D(32, (3, 3), strides=2, padding='same', activation=None)(inputs)
+    x = BatchNormalization()(x)
+    x = Activation(activation_fn)(x)
+
+    def bottleneck_block(x, filters):
+        dw = DepthwiseConv2D((3, 3), padding='same')(x)
+        dw = BatchNormalization()(dw)
+        dw = Activation(activation_fn)(dw)
+
+        pw = Conv2D(filters, (1, 1), padding='same')(dw)
+        pw = BatchNormalization()(pw)
+        pw = Activation(activation_fn)(pw)
+        return pw
+
+    x = bottleneck_block(x, 64)
+    x = bottleneck_block(x, 64)
+    x = MaxPooling2D((2, 2))(x)
+    x = bottleneck_block(x, 128)
+    x = bottleneck_block(x, 128)
+
+    x = GlobalAveragePooling2D()(x)
+    outputs = Dense(10, activation='softmax')(x)
+
+    model = Model(inputs, outputs)
+    return model
+
+# โหลดข้อมูล CIFAR-10
+(x_train, y_train), (x_test, y_test) = tf.keras.datasets.cifar10.load_data()
+
+x_train = x_train.astype('float32') / 255.0
+x_test = x_test.astype('float32') / 255.0
+
+# เตรียมสำหรับเก็บผลลัพธ์
+accuracy_results = {}
+loss_results = {}
+
+epochs = 50
+batch_size = 64
+
+# เทรนด้วย relu6
+model_relu6 = build_model(relu6)
+model_relu6.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),
+                    loss='sparse_categorical_crossentropy',
+                    metrics=['accuracy'])
+print("Training with relu6 activation")
+history_relu6 = model_relu6.fit(x_train, y_train, epochs=epochs, validation_data=(x_test, y_test), batch_size=batch_size)
+
+# เก็บผลลัพธ์
+accuracy_results['relu6'] = np.array(history_relu6.history['accuracy'])
+loss_results['relu6'] = np.array(history_relu6.history['loss'])
+
+# เทรนด้วย paralu
+model_paralu = build_model(paralu)
+model_paralu.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),
+                     loss='sparse_categorical_crossentropy',
+                     metrics=['accuracy'])
+print("\nTraining with paralu activation")
+history_paralu = model_paralu.fit(x_train, y_train, epochs=epochs, validation_data=(x_test, y_test), batch_size=batch_size)
+
+# เก็บผลลัพธ์
+accuracy_results['paralu'] = np.array(history_paralu.history['accuracy'])
+loss_results['paralu'] = np.array(history_paralu.history['loss'])
+
+# แสดงผล (ตัวอย่าง)
+import matplotlib.pyplot as plt
+
+# Plot Accuracy
+plt.plot(accuracy_results['relu6'], label='ReLU6')
+plt.plot(accuracy_results['paralu'], label='Paralu')
+plt.xlabel('Epoch')
+plt.ylabel('Accuracy')
+plt.title('Training Accuracy Comparison')
+plt.legend()
+plt.show()
+
+# Plot Loss
+plt.plot(loss_results['relu6'], label='ReLU6')
+plt.plot(loss_results['paralu'], label='Paralu')
+plt.xlabel('Epoch')
+plt.ylabel('Loss')
+plt.title('Training Loss Comparison')
+plt.legend()
+plt.show()
